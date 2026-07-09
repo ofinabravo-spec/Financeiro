@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Controle Financeiro PRO (Nuvem)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    :root {
+        --bg-main: #0f111a;
+        --bg-card: #161925;
+        --bg-input: #23283b;
+        --accent: #00e676;
+        --primary: #2979ff;
+        --warning: #ff9100;
+        --danger: #ff1744;
+        --text: #ffffff;
+        --text-muted: #a0aec0;
+    }
+    body {
+        margin: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: var(--bg-main);
+        color: var(--text);
+    }
+    header {
+        background: var(--bg-card);
+        padding: 20px;
+        text-align: center;
+        font-size: 22px;
+        font-weight: bold;
+        border-bottom: 2px solid #202538;
+    }
+    .tabs {
+        display: flex;
+        background: var(--bg-card);
+        margin-bottom: 15px;
+    }
+    .tabs button {
+        flex: 1;
+        padding: 15px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-weight: bold;
+        cursor: pointer;
+        transition: 0.3s;
+        border-bottom: 3px solid transparent;
+    }
+    .tabs button.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+        background: rgba(0, 230, 118, 0.05);
+    }
+    .container { padding: 15px; max-width: 800px; margin: 0 auto; }
+    .card {
+        background: var(--bg-card);
+        padding: 20px;
+        margin-bottom: 15px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    }
+    h3 { margin-top: 0; margin-bottom: 15px; font-size: 18px; color: var(--text); display: flex; align-items: center; gap: 8px;}
+    label { font-size: 12px; color: var(--text-muted); display: block; margin-top: 8px; }
+    input, select {
+        width: 100%;
+        padding: 12px;
+        margin: 6px 0 12px 0;
+        border: 1px solid #2d3446;
+        border-radius: 8px;
+        background: var(--bg-input);
+        color: white;
+        box-sizing: border-box;
+    }
+    .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    .btn {
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+        transition: 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+    .btn:hover { filter: brightness(1.2); }
+    .btn-success { background: var(--accent); color: #000; }
+    .btn-primary { background: var(--primary); }
+    .btn-warning { background: var(--warning); }
+    .btn-danger { background: var(--danger); }
+    
+    .item {
+        background: var(--bg-input);
+        padding: 12px;
+        margin: 8px 0;
+        border-radius: 8px;
+        border-left: 4px solid var(--primary);
+    }
+    .item.vale { border-left-color: var(--danger); }
+    .saldo-destaque { font-size: 24px; font-weight: bold; margin-bottom: 15px; color: var(--accent); }
+    .hidden { display: none !important; }
+    
+    .ranking-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px;
+        background: var(--bg-input);
+        margin: 4px 0;
+        border-radius: 6px;
+    }
+    .ranking-position { font-weight: bold; color: var(--warning); }
+
+    #toast {
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        background: var(--accent); color: #000; padding: 12px 25px;
+        border-radius: 30px; font-weight: bold; opacity: 0; transition: .3s; z-index: 9999;
+    }
+    #toast.show { opacity: 1; }
+
+    .contador-servicos {
+        background: var(--bg-input);
+        padding: 10px;
+        border-radius: 8px;
+        font-weight: bold;
+        margin-bottom: 15px;
+        font-size: 14px;
+        border-left: 4px solid var(--accent);
+    }
+
+    @media print {
+        body { background: white; color: black; }
+        .tabs, input, select, button, .btn, .card:has(input), header { display: none !important; }
+        .card { background: white; color: black; box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
+        .item { background: #f5f5f5; color: black; border: 1px solid #ddd; }
+    }
+</style>
+</head>
+<body>
+
+<header>📋 Controle Financeiro PRO</header>
+<button onclick="history.back()" style="
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background: #23283b;
+    color: white;
+    border: 1px solid #2d3446;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 10000;
+    font-size: 14px;
+">⬅️ Voltar</button>
+
+<div class="tabs">
+    <button id="tab-ind" class="active" onclick="show('individual')">👤 Mecânicos / Individual</button>
+    <button id="tab-ger" onclick="show('geral')">🌐 Relatório Geral & Ranking</button>
+</div>
+
+<div class="container">
+
+    <div class="card">
+        <h3>📅 Filtro de Período Geral</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+                <label>De:</label>
+                <input type="date" id="filtroInicio" onchange="globalRefresh()">
+            </div>
+            <div>
+                <label>Até:</label>
+                <input type="date" id="filtroFim" onchange="globalRefresh()">
+            </div>
+        </div>
+    </div>
+
+    <div id="individualBox">
+        <div class="card">
+            <h3>⚙️ Configuração Geral</h3>
+            <label>Taxa de Retenção da Empresa (%)</label>
+            <input id="taxa" type="number" placeholder="Ex: 20">
+            <button class="btn btn-success" onclick="salvarTaxa()">💾 Salvar Taxa</button>
+        </div>
+
+        <div class="card">
+            <h3>👤 Cadastrar Novo Mecânico</h3>
+            <input id="nome" placeholder="Nome do Mecânico">
+            <input id="telefone" placeholder="Telefone (Ex: 5591982976479) - Salvo Localmente">
+            <button class="btn btn-success" onclick="addUserLocal()">➕ Adicionar Mecânico</button>
+        </div>
+
+        <div class="card">
+            <h3>💸 Novo Lançamento</h3>
+            <label>Selecionar Mecânico</label>
+            <select id="userSelect" onchange="autoRender()"></select>
+            
+            <label>Valor (R$)</label>
+            <input id="valor" type="number" placeholder="0.00" step="0.01">
+            
+            <label>Descrição do Serviço</label>
+            <input id="desc" placeholder="Ex: Alinhamento, Troca de Óleo...">
+            
+            <label>Tipo</label>
+            <select id="tipo">
+                <option value="acrescimo">➕ Ganho (Serviço executado)</option>
+                <option value="vale">🧾 Gasto (Vale / Retirada)</option>
+            </select>
+            <button class="btn btn-success" onclick="addPaymentCloud()">💾 Gravar Lançamento</button>
+        </div>
+
+        <div class="card">
+            <h3>📊 Desempenho no Período</h3>
+            <div id="contadorServicos" class="contador-servicos">🛠️ Serviços Realizados: 0</div>
+            <canvas id="chart" style="max-height: 220px;"></canvas>
+        </div>
+
+        <div class="card" id="resumo"></div>
+        
+        <div class="card">
+            <h3>📜 Histórico de Lançamentos</h3>
+            <div id="listaLancamentos"></div>
+        </div>
+    </div>
+
+    <div id="geralBox" class="hidden">
+        <div class="card">
+            <h3>🏢 Gastos Operacionais da Empresa</h3>
+            <input id="gastoValor" type="number" placeholder="Valor R$" step="0.01">
+            <input id="gastoDesc" placeholder="Descrição do Gasto">
+            <button class="btn btn-success" onclick="addGastoEmpresaCloud()">➕ Registrar Gasto</button>
+            <div id="listaGastosEmpresa" style="margin-top: 15px;"></div>
+        </div>
+
+        <div class="card" id="resumoGeral"></div>
+        
+        <div class="card">
+            <h3>🏆 Ranking de Mecânicos no Período</h3>
+            <div id="rankingMecanicos"></div>
+        </div>
+    </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL = "https://pgftrljdbtnoeseljbog.supabase.co"; 
+const SUPABASE_KEY = "sb_publishable_V5O-twUL0jm-zeIrtnpd3Q_Cz4A1khY"; 
+
+const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+let localMecanicos = JSON.parse(localStorage.getItem("cloud_mecanicos")) || [];
+let phones = JSON.parse(localStorage.getItem("phones")) || {};
+let taxaGlobal = 20;
+let cacheLancamentos = [];
+let cacheGastosEmpresa = [];
+let chart;
+let currentTab = "individual";
+
+const hoje = new Date();
+document.getElementById('filtroInicio').value = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+document.getElementById('filtroFim').value = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
+
+function toast(msg){
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(()=>t.classList.remove("show"),2000);
+}
+
+async function inicializarSistema() {
+    if(!supabase) return;
+    
+    try { await carregarTaxa(); } catch(e){}
+    try { await puxarDadosNuvem(); } catch(e){}
+
+    updateUserSelect();
+    globalRefresh();
+}
+
+async function carregarTaxa() {
+    let { data } = await supabase.from('configuracoes').select('*').eq('chave', 'taxa').maybeSingle();
+    if(data) {
+        taxaGlobal = Number(data.valor);
+        document.getElementById('taxa').value = taxaGlobal;
+    } else {
+        document.getElementById('taxa').value = taxaGlobal;
+    }
+}
+
+async function salvarTaxa() {
+    let novaTaxa = document.getElementById("taxa").value;
+    if(!novaTaxa) return;
+    await supabase.from('configuracoes').upsert({ chave: 'taxa', valor: String(novaTaxa) });
+    taxaGlobal = Number(novaTaxa);
+    toast('✅ Taxa atualizada na Nuvem!');
+    globalRefresh();
+}
+
+async function puxarDadosNuvem() {
+    let { data: lancamentos } = await supabase.from('lancamentos').select('*');
+    let { data: gastos } = await supabase.from('gastos_empresa').select('*');
+    
+    cacheLancamentos = lancamentos || [];
+    cacheGastosEmpresa = gastos || [];
+
+    // Ajuste importante: Garante que os mecânicos locais não sumam se o banco estiver limpo
+    let mecanicosUnicos = new Set([...localMecanicos, ...cacheLancamentos.map(l => l.mecanico)]);
+    localMecanicos = Array.from(mecanicosUnicos).filter(Boolean);
+    localStorage.setItem("cloud_mecanicos", JSON.stringify(localMecanicos));
+}
+
+function updateUserSelect() {
+    let sel = document.getElementById("userSelect");
+    let atual = sel.value;
+    sel.innerHTML = "";
+    
+    localMecanicos.forEach(n => {
+        let o = document.createElement("option");
+        o.value = n; o.text = n;
+        sel.appendChild(o);
+    });
+    
+    if(atual && localMecanicos.includes(atual)) {
+        sel.value = atual;
+    } else if(sel.value) {
+        autoRender();
+    } else {
+        document.getElementById("resumo").innerHTML = "<div class='item'>Cadastre um mecânico para iniciar os lançamentos.</div>";
+    }
+}
+
+function addUserLocal() {
+    let nome = document.getElementById("nome").value.trim();
+    let telefone = document.getElementById("telefone").value.trim().replace(/\D/g, "");
+    if(!nome) return alert("Digite o nome do mecânico");
+    
+    if(!localMecanicos.includes(nome)) {
+        localMecanicos.push(nome);
+        localStorage.setItem("cloud_mecanicos", JSON.stringify(localMecanicos));
+    }
+    if(telefone) {
+        phones[nome] = telefone;
+        localStorage.setItem("phones", JSON.stringify(phones));
+    }
+    document.getElementById("nome").value = "";
+    document.getElementById("telefone").value = "";
+    
+    // Força a atualização do menu de seleção na hora!
+    updateUserSelect();
+    document.getElementById("userSelect").value = nome;
+    
+    toast('✅ Mecânico cadastrado!');
+    autoRender();
+}
+
+async function addPaymentCloud() {
+    let user = document.getElementById("userSelect").value;
+    let valor = Number(document.getElementById("valor").value);
+    let tipo = document.getElementById("tipo").value;
+    let desc = document.getElementById("desc").value || "Sem descrição";
+
+    if(!user || !valor) return alert("Selecione o mecânico e informe o valor");
+
+    let { error } = await supabase.from('lancamentos').insert([{
+        mecanico: user,
+        valor: valor,
+        tipo: tipo,
+        desc_servico: desc,
+        data_cadastro: new Date().toISOString()
+    }]);
+
+    if(error) {
+        alert("Erro ao gravar: " + error.message);
+        return;
+    }
+
+    document.getElementById("valor").value = "";
+    document.getElementById("desc").value = "";
+    toast('✅ Gravado na Nuvem!');
+    await puxarDadosNuvem();
+    globalRefresh();
+}
+
+function calc(nome) {
+    let ganhos = 0, gastos = 0, qtdServicos = 0;
+    let ini = new Date(document.getElementById('filtroInicio').value + 'T00:00:00');
+    let fim = new Date(document.getElementById('filtroFim').value + 'T23:59:59');
+
+    let filtrados = cacheLancamentos.filter(x => {
+        if(x.mecanico !== nome) return false;
+        let d = new Date(x.data_cadastro || x.created_at);
+        return d >= ini && d <= fim;
+    });
+
+    filtrados.forEach(x => {
+        if(x.tipo === "vale") {
+            gastos += Number(x.valor);
+        } else {
+            ganhos += Number(x.valor);
+            qtdServicos++;
+        }
+    });
+
+    let taxaValor = ganhos * (taxaGlobal / 100);
+    return {ganhos, gastos, taxaValor, saldo: ganhos - gastos - taxaValor, filtrados, qtdServicos};
+}
+
+async function pagarUser(nome) {
+    if(confirm(`Zerar e apagar permanentemente o histórico de ${nome} na Nuvem?`)) {
+        await supabase.from('lancamentos').delete().eq('mecanico', nome);
+        toast('✔ Conta fechada!');
+        await puxarDadosNuvem();
+        globalRefresh();
+    }
+}
+
+async function deleteItem(id) {
+    await supabase.from('lancamentos').delete().eq('id', id);
+    toast('🗑️ Item removido!');
+    await puxarDadosNuvem();
+    globalRefresh();
+}
+
+async function editItem(id) {
+    let valor = prompt("Novo valor:");
+    let desc = prompt("Nova descrição:");
+    if(valor === null || desc === null) return;
+
+    await supabase.from('lancamentos').update({ valor: Number(valor), desc_servico: desc }).eq('id', id);
+    toast('✏️ Item atualizado!');
+    await puxarDadosNuvem();
+    globalRefresh();
+}
+
+function show(type){
+    currentTab = type;
+    document.getElementById("individualBox").classList.toggle("hidden", type!=="individual");
+    document.getElementById("geralBox").classList.toggle("hidden", type!=="geral");
+    document.getElementById("tab-ind").classList.toggle("active", type==="individual");
+    document.getElementById("tab-ger").classList.toggle("active", type==="geral");
+    globalRefresh();
+}
+
+function globalRefresh() {
+    if(currentTab === "geral") {
+        renderGeral();
+    } else {
+        let u = document.getElementById("userSelect").value;
+        if(u) renderUser(u);
+    }
+}
+
+function renderUser(nome) {
+    let r = calc(nome);
+    document.getElementById("contadorServicos").textContent = `🛠️ Serviços Realizados: ${r.qtdServicos}`;
+
+    if(chart) chart.destroy();
+    
+    let labelsGrafico = r.filtrados.map(x => (x.desc_servico || "Serviço").substring(0,10));
+    if(labelsGrafico.length === 0) labelsGrafico = ["Sem dados"];
+
+    chart = new Chart(document.getElementById("chart"),{
+        type:"bar",
+        data:{
+            labels: labelsGrafico,
+            datasets:[{
+                label: 'Movimentações (R$)',
+                data: r.filtrados.map(x => x.tipo === "vale" ? -Number(x.valor) : Number(x.valor)),
+                backgroundColor: r.filtrados.map(x => x.tipo === "vale" ? '#ff1744' : '#00e676')
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+
+    document.getElementById("resumo").innerHTML = `
+        <div class="saldo-destaque">👤 ${nome}</div>
+        <div class="saldo-destaque" style="color:${r.saldo >= 0 ? '#00e676':'#ff1744'}">💵 Saldo Líquido: R$ ${r.saldo.toFixed(2)}</div>
+        <div style="margin-bottom: 15px;">
+            <div>🛠️ Serviços Feitos: ${r.qtdServicos}</div>
+            <div>💰 Produção Bruta: R$ ${r.ganhos.toFixed(2)}</div>
+            <div>🧾 Vales Retirados: R$ ${r.gastos.toFixed(2)}</div>
+            <div>📉 Retenção Oficina (${taxaGlobal}%): R$ ${r.taxaValor.toFixed(2)}</div>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="enviarWhatsApp('${nome}')">💬 Enviar WhatsApp</button>
+            <button class="btn btn-warning" onclick="window.print()">🖨️ Exportar Período</button>
+        </div>
+        <button class="btn btn-danger" style="margin-top:10px;" onclick="pagarUser('${nome}')">✔ Fechar Conta / Zerar Histórico</button>
+    `;
+
+    document.getElementById("listaLancamentos").innerHTML = r.filtrados.map(i => `
+        <div class="item ${i.tipo}">
+            <strong>${i.tipo === 'vale' ? '🧾 GASTO/VALE' : '➕ GANHO'}</strong> - R$ ${Number(i.valor).toFixed(2)}<br>
+            <small>${i.desc_servico || ""}</small> <br>
+            <span style="font-size:10px; color:var(--text-muted)">${new Date(i.data_cadastro || i.created_at).toLocaleDateString()}</span>
+            <div class="btn-group" style="grid-template-columns: 1fr 1fr; margin-top:5px;">
+                <button class="btn btn-warning" style="padding:4px; font-size:12px;" onclick="editItem(${i.id})">Editar</button>
+                <button class="btn btn-danger" style="padding:4px; font-size:12px;" onclick="deleteItem(${i.id})">Excluir</button>
+            </div>
+        </div>
+    `).join("");
+}
+
+function autoRender() {
+    let u = document.getElementById("userSelect").value;
+    if(u) renderUser(u);
+}
+
+async function addGastoEmpresaCloud() {
+    let v = Number(document.getElementById("gastoValor").value);
+    let d = document.getElementById("gastoDesc").value || "Gasto Geral";
+    if(!v) return alert("Insira um valor para o gasto.");
+
+    let { error } = await supabase.from('gastos_empresa').insert([{ 
+        valor: v, 
+        descricao: d,
+        data_cadastro: new Date().toISOString()
+    }]);
+
+    if(error) return alert("Erro ao inserir gasto: " + error.message);
+
+    document.getElementById("gastoValor").value = "";
+    document.getElementById("gastoDesc").value = "";
+    toast('💸 Gasto registrado na Nuvem!');
+    await puxarDadosNuvem();
+    renderGeral();
+}
+
+async function removerGastoEmpresaCloud(id) {
+    await supabase.from('gastos_empresa').delete().eq('id', id);
+    toast('💸 Gasto removido!');
+    await puxarDadosNuvem();
+    renderGeral();
+}
+
+function renderGeral() {
+    let totalG = 0, totalT = 0;
+    let ranking = [];
+    let ini = new Date(document.getElementById('filtroInicio').value + 'T00:00:00');
+    let fim = new Date(document.getElementById('filtroFim').value + 'T23:59:59');
+
+    localMecanicos.forEach(n => {
+        let r = calc(n);
+        totalG += r.ganhos;
+        totalT += r.taxaValor;
+        ranking.push({nome: n, faturamento: r.ganhos});
+    });
+
+    ranking.sort((a,b) => b.faturamento - a.faturamento);
+
+    let gastosEmpFiltrados = cacheGastosEmpresa.filter(g => {
+        let d = new Date(g.data_cadastro || g.created_at);
+        return d >= ini && d <= fim;
+    });
+
+    let gastoEmp = gastosEmpFiltrados.reduce((a,b) => a + Number(b.valor), 0);
+    let lucro = totalT - gastoEmp;
+
+    document.getElementById("resumoGeral").innerHTML = `
+        <h3>📊 Balanço Geral Oficina (No Período)</h3>
+        <div class="saldo-destaque" style="color:${lucro >= 0 ? '#00e676':'#ff1744'}">🏢 Lucro Líquido: R$ ${lucro.toFixed(2)}</div>
+        <div>💰 Faturamento Total Bruto: R$ ${totalG.toFixed(2)}</div>
+        <div>📉 Retenção de Taxas (${taxaGlobal}%): R$ ${totalT.toFixed(2)}</div>
+        <div>💸 Gastos Operacionais: R$ ${gastoEmp.toFixed(2)}</div>
+        <button class="btn btn-warning" style="margin-top:15px;" onclick="window.print()">🖨️ Imprimir Balanço Geral</button>
+    `;
+
+    document.getElementById("rankingMecanicos").innerHTML = ranking.map((m, idx) => `
+        <div class="ranking-item">
+            <span><span class="ranking-position">#${idx+1}</span> ${m.nome}</span>
+            <strong>R$ ${m.faturamento.toFixed(2)}</strong>
+        </div>
+    `).join("");
+
+    document.getElementById("listaGastosEmpresa").innerHTML = gastosEmpFiltrados.map(g => `
+        <div class="item vale">
+            R$ ${Number(g.valor).toFixed(2)} - ${g.descricao} <br>
+            <span style="font-size:10px; color:var(--text-muted)">${new Date(g.data_cadastro || g.created_at).toLocaleDateString()}</span>
+            <button class="btn btn-danger" style="padding:4px; margin-top:5px; font-size:12px;" onclick="removerGastoEmpresaCloud(${g.id})">Excluir</button>
+        </div>
+    `).join("");
+}
+
+function enviarWhatsApp(nome){
+    let r = calc(nome);
+    let fone = phones[nome];
+    if(!fone) return alert("Não há telefone cadastrado para este mecânico neste dispositivo.");
+
+    let texto = `*Resumo Financeiro - ${nome}*\n\n` +
+                `📅 Período: ${document.getElementById('filtroInicio').value} até ${document.getElementById('filtroFim').value}\n` +
+                `🛠️ *Serviços Feitos:* ${r.qtdServicos}\n` +
+                `💰 *Ganhos Brutos:* R$ ${r.ganhos.toFixed(2)}\n` +
+                `🧾 *Vales/Gastos:* R$ ${r.gastos.toFixed(2)}\n` +
+                `📉 *Taxa Oficina (${taxaGlobal}%):* R$ ${r.taxaValor.toFixed(2)}\n` +
+                `-----------------------------\n` +
+                `💵 *Saldo Líquido a Receber:* R$ ${r.saldo.toFixed(2)}`;
+    
+    window.open(`https://api.whatsapp.com/send?phone=${fone}&text=${encodeURIComponent(texto)}`, '_blank');
+}
+
+inicializarSistema();
+</script>
+</body>
+</html>
